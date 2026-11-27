@@ -276,7 +276,7 @@ if(Math.abs(c)>1e-9){nrm=c/pin.v;pinTxt=`Vorgabe: δ${pin.c=="d"?"":pin.c=="t"?"
 else pinMsg=" (Vorgabeknoten ist unbeweglich oder nicht vorhanden)"}
 const dsp=(k,p)=>{const[u,v,w]=bv(k).map(z=>z/nrm),x=p[0]*C,y=p[1]*C;return[u-w*y,v+w*x]};
 let md=0;const L2=[];bars.forEach((b,k)=>{const da=dsp(k,b.a),db=dsp(k,b.b);md=Math.max(md,Math.hypot(...da),Math.hypot(...db));L2.push([k,da,db])});
-const sf=md>1e-9?.15*Math.max(G.c,G.r)*C/md*(+$("ksc").value):0;
+let tm=0;bars.forEach((b,k)=>{if(bs[k])tm=Math.max(tm,Math.abs(bv(k)[2]/nrm))});const sf=md>1e-9?(tm>1e-9?Math.tan(15*Math.PI/180)/tm:.15*Math.max(G.c,G.r)*C/md)*(+$("ksc").value):0;
 kin={md,pts:[],seg:[],txt:(pinTxt||(ref?`Scheibe ${RM[ref]} dreht um Pol (${RM[ref]}) mit ϑ = 1 (infinitesimal)`:"Translation der Scheiben (Pole im Unendlichen)"))+pinMsg};
 L2.forEach(([k,da,db])=>{if(!bs[k])return;const b=bars[k],q=(p,d)=>[(p[0]*C+sf*d[0])/C*P,-(p[1]*C+sf*d[1])/C*P];const a2=q(b.a,da),b2=q(b.b,db);kin.pts.push(a2,b2);kin.seg.push({k,a:[sx(b.a),sy(b.a)],b:[sx(b.b),sy(b.b)],a2,b2,da,db,ka:b.a,kb:b.b})});kin.sup=[];sup.forEach((v,key)=>{if(v.t!="L")return;for(const q of kin.seg){if(q.ka+""==key){kin.sup.push({v,p:q.a2});break}if(q.kb+""==key){kin.sup.push({v,p:q.b2});break}}})}
 R.kin=kin;$("kc").style.display=f?"flex":"none";$("kinfo").textContent=kin?kin.txt+(f>1?` (Bewegungsfigur ${mode+1} von ${f})`:"")+"; die Darstellung ist überhöht, die Zahlenwerte gelten für diese Normierung (δ resultierend, δu horizontal, δw vertikal, nach unten positiv).":"";
