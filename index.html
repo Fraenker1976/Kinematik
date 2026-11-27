@@ -260,20 +260,34 @@ for(let i=1;i<=n;i++)h+=`<tr><td>${L(i,0)}</td><td class="wa">Hauptpol</td><td>$
 for(let i=1;i<=n;i++)for(let j=i+1;j<=n;j++)h+=`<tr><td>${L(i,j)}</td><td>Nebenpol</td><td>${fp(g(i,j))}</td></tr>`;
 h+=`</tbody></table></div><p class="${tri==triOk?"ok":"bad"}">Polgesetz: ${triOk} von ${tri} prüfbaren Tripeln kollinear${tri==triOk?" ✓":" ✗"}</p>`}
 else h+=`<p class="note">Alle Stäbe gehören zur Erdscheibe; es gibt keine Scheiben mit Polen.</p>`}}
-$("out").innerHTML=h;const md=$("md");if(md)md.onchange=e=>{mode=+e.target.value;compute()};
+h+=kHTML();$("out").innerHTML=h;const md=$("md");if(md)md.onchange=e=>{mode=+e.target.value;compute()};
 selB.clear();selS.clear();render();hpush()}
 
-function render(){const{n,f,bs,sc,g,C,mv}=R;
-const ok=p=>p&&!p.z&&!p.inf&&Math.hypot(p.x/C-G.c/2,p.y/C-G.r/2)<4*Math.max(G.c,G.r);
-const poles=[];if(f&&RO.poles)for(let i=1;i<=n;i++){poles.push({i,j:0,p:g(i,0)});for(let j=i+1;j<=n;j++)poles.push({i,j,p:g(i,j)})}
-const vis=poles.filter(a=>ok(a.p)),pp=a=>[a.p.x/C*P,-a.p.y/C*P];
-let kin=null;
-if(f&&mv&&(KON()||PJ())){const bv=k=>mv.slice(3*k,3*k+3);let ref=0;for(let i=1;i<=n&&!ref;i++)if(Math.abs(bv(sc[i-1])[2])>1e-9)ref=i;
+function kNorm(){const{n,bs,sc,C,mv}=R;const bv=k=>mv.slice(3*k,3*k+3);let ref=0;for(let i=1;i<=n&&!ref;i++)if(Math.abs(bv(sc[i-1])[2])>1e-9)ref=i;
 let nrm=ref?bv(sc[ref-1])[2]:(Math.max(...mv.map(Math.abs))||1),pinTxt="",pinMsg="";
 if(pin){let fo=null;bars.forEach((b,k)=>{if(fo||!bs[k])return;[b.a,b.b].forEach(p=>{if(!fo&&p+""==pin.key)fo=[k,p]})});
 if(fo){const[u,v,w]=bv(fo[0]),x=fo[1][0]*C,y=fo[1][1]*C,du=u-w*y,dv=v+w*x,c=pin.c=="t"?(pin.sch?bv(sc[pin.sch-1])[2]:0):pin.c=="u"?du:pin.c=="w"?-dv:Math.hypot(du,dv);
 if(Math.abs(c)>1e-9){nrm=c/pin.v;pinTxt=`Vorgabe: δ${pin.c=="d"?"":pin.c=="t"?"ϑ ("+RM[pin.sch]+")":pin.c} = ${F(pin.v)}${pin.c=="t"?" rad":""} am Knoten ${R.nodes.indexOf(pin.key)+1} (${F(x)} | ${F(Zc(y))})`}else pinMsg=" (Vorgabe nicht möglich: Der Knoten bewegt sich in dieser Richtung nicht; Standardnormierung verwendet)"}
 else pinMsg=" (Vorgabeknoten ist unbeweglich oder nicht vorhanden)"}
+return{bv,ref,nrm,pinTxt,pinMsg}}
+function kState(){const{n,f,bs,sc,C,mv,nodes}=R;if(!f||!mv)return null;const K=kNorm(),{bv,nrm,ref}=K;
+const txt=(K.pinTxt||(ref?`Scheibe ${RM[ref]} dreht um Pol (${RM[ref]}) mit δϑ = 1 rad`:"Translation der Scheiben (Pole im Unendlichen)"))+K.pinMsg;
+const rot=[];for(let i=1;i<=n;i++)rot.push({i,t:bv(sc[i-1])[2]/nrm});
+const nd=[];nodes.forEach((key,ix)=>{const c=key.split(",").map(Number),x=c[0]*C,y=c[1]*C,gr=[];
+bars.forEach((b,k)=>{if(b.a+""!=key&&b.b+""!=key)return;const[u,v,w]=bs[k]?bv(k).map(z=>z/nrm):[0,0,0],du=u-w*y,dw=-(v+w*x);let e=gr.find(q=>Math.abs(q.du-du)<1e-9&&Math.abs(q.dw-dw)<1e-9);if(e){if(!e.sch.includes(bs[k]))e.sch.push(bs[k])}else gr.push({du,dw,sch:[bs[k]]})});
+const z0=v=>Math.abs(v)<1e-12?0:v;gr.forEach(q=>nd.push({nr:ix+1,x,z:Zc(y),sch:q.sch.sort((a,b)=>a-b).map(i=>RM[i]).join(", "),du:z0(q.du),dw:z0(q.dw),d:Math.hypot(q.du,q.dw),split:gr.length>1}))});
+return{txt,rot,nd}}
+function kHTML(){const S=kState();if(!S)return"";
+let h=`<h3 style="font-size:1rem;margin:18px 0 6px">Verschiebungszustand${R.f>1?` (Bewegungsfigur ${mode+1} von ${R.f})`:""}</h3><p>${S.txt}.</p>`;
+h+=`<div class="tw" style="margin-bottom:14px"><table class="res"><thead><tr><th>Scheibe</th><th style="text-align:right">δϑ [rad]</th></tr></thead><tbody>${S.rot.map(r=>`<tr><td>${RM[r.i]}</td><td style="text-align:right">${F(r.t)}</td></tr>`).join("")}<tr><td>Erde</td><td style="text-align:right">0</td></tr></tbody></table></div>`;
+h+=`<div class="tw"><table class="res"><thead><tr><th>Knoten</th><th>Scheibe</th><th style="text-align:right">δu</th><th style="text-align:right">δw</th><th style="text-align:right">δ</th></tr></thead><tbody>${S.nd.map(q=>`<tr><td>${q.nr}</td><td>${q.sch}</td><td style="text-align:right">${F(q.du)}</td><td style="text-align:right">${F(q.dw)}</td><td style="text-align:right">${F(q.d)}</td></tr>`).join("")}</tbody></table></div>`;
+h+=`<p class="note">δϑ linksdrehend positiv, δu nach rechts positiv, δw nach unten positiv, δ = √(δu² + δw²). Stehen bei einem Knoten mehrere Zeilen, hat er an einem Querkraft- oder Normalkraftgelenk je Scheibe eine eigene Verschiebung.</p>`;return h}
+function render(){const{n,f,bs,sc,g,C,mv}=R;
+const ok=p=>p&&!p.z&&!p.inf&&Math.hypot(p.x/C-G.c/2,p.y/C-G.r/2)<4*Math.max(G.c,G.r);
+const poles=[];if(f&&RO.poles)for(let i=1;i<=n;i++){poles.push({i,j:0,p:g(i,0)});for(let j=i+1;j<=n;j++)poles.push({i,j,p:g(i,j)})}
+const vis=poles.filter(a=>ok(a.p)),pp=a=>[a.p.x/C*P,-a.p.y/C*P];
+let kin=null;
+if(f&&mv&&(KON()||PJ())){const{bv,ref,nrm,pinTxt,pinMsg}=kNorm();
 const dsp=(k,p)=>{const[u,v,w]=bv(k).map(z=>z/nrm),x=p[0]*C,y=p[1]*C;return[u-w*y,v+w*x]};
 let md=0;const L2=[];bars.forEach((b,k)=>{const da=dsp(k,b.a),db=dsp(k,b.b);md=Math.max(md,Math.hypot(...da),Math.hypot(...db));L2.push([k,da,db])});
 let tm=0;bars.forEach((b,k)=>{if(bs[k])tm=Math.max(tm,Math.abs(bv(k)[2]/nrm))});const sf=md>1e-9?(tm>1e-9?Math.tan(15*Math.PI/180)/tm:.15*Math.max(G.c,G.r)*C/md)*(+$("ksc").value):0;
@@ -374,7 +388,7 @@ function openPin(key){pk=key;$("pt").textContent=`Knoten ${R.nodes.indexOf(key)+
 $("pok").onclick=()=>{const v=parseFloat($("pv").value);if(isFinite(v)&&v!==0)pin={key:pk,c:$("pc").value,v,sch:+$("ps").value||0};$("pdlg").close();render();hpush()};
 $("pno").onclick=()=>$("pdlg").close();$("kclr").onclick=()=>{pin=null;render();hpush()};
 ["nn","bn","cs","fs"].forEach(i=>$(i).oninput=render);
-const r6=v=>Math.round(v*1e6)/1e6;const VER="2.3";
+const r6=v=>Math.round(v*1e6)/1e6;const VER="2.4";
 let hist=[],hp=-1;const snap=()=>JSON.stringify({G,bars,sup:[...sup],pin});
 function updHist(){$("ud").disabled=hp<=0;$("rd").disabled=hp>=hist.length-1}
 function hpush(){const s=snap();if(s===hist[hp]){updHist();return}hist=hist.slice(0,hp+1);hist.push(s);if(hist.length>150){hist.shift()}hp=hist.length-1;updHist()}
@@ -410,15 +424,17 @@ async function makePdf(){const sel={};document.querySelectorAll("#rdlg [data-r]"
 const J=window.jspdf&&window.jspdf.jsPDF;if(!J){$("rm").textContent="Die PDF-Bibliothek konnte nicht geladen werden.";return 0}
 const doc=new J({unit:"mm",format:"a4",compress:true}),W=210,X0=15,{n,f,g,bs,nodes}=R,nno=p=>nodes.indexOf(p+"")+1;let y=X0,sn=0;
 const nw=h=>{if(y+h>287){doc.addPage();y=X0}};
-const HS=(t,m=40)=>{nw(m);doc.setFont("helvetica","bold");doc.setFontSize(13);doc.text(PT(`${++sn} ${t}`),X0,y+5);y+=9};
+const TBH=r=>Math.min(9+6+r*5+3,287-X0),HS=(t,m=40)=>{nw(m);doc.setFont("helvetica","bold");doc.setFontSize(13);doc.text(PT(`${++sn} ${t}`),X0,y+5);y+=9};
 const TX=(t,s=10)=>{doc.setFont("helvetica","normal");doc.setFontSize(s);doc.splitTextToSize(PT(t),W-2*X0).forEach(l=>{nw(5);doc.text(l,X0,y+4);y+=5})};
-const TB=(hd,rows,xs)=>{nw(12);doc.setFont("helvetica","bold");doc.setFontSize(9);hd.forEach((c,i)=>doc.text(PT(c),xs[i],y+4));y+=6;doc.setDrawColor(150);doc.line(X0,y-.8,W-X0,y-.8);doc.setFont("helvetica","normal");rows.forEach(r=>{nw(5);r.forEach((c,i)=>doc.text(PT(c),xs[i],y+3.5));y+=5});y+=3};
+const TB=(hd,rows,xs)=>{const TH=()=>{doc.setFont("helvetica","bold");doc.setFontSize(9);hd.forEach((c,i)=>doc.text(PT(c),xs[i],y+4));y+=6;doc.setDrawColor(150);doc.line(X0,y-.8,W-X0,y-.8);doc.setFont("helvetica","normal");doc.setFontSize(9)};
+const full=6+rows.length*5+3;if(full<=287-X0)nw(full);else nw(6+5*Math.min(3,rows.length));TH();
+rows.forEach(r=>{if(y+5>287){doc.addPage();y=X0;TH()}r.forEach((c,i)=>doc.text(PT(c),xs[i],y+3.5));y+=5});y+=3};
 const IMG=png=>{if(!png)return;const h=(W-2*X0)*9/16;nw(h+3);doc.addImage(png,"JPEG",X0,y,W-2*X0,h);y+=h+4};
 doc.setFont("helvetica","bold");doc.setFontSize(18);doc.text(PT($("rt").value||"Protokoll"),X0,y+6);y+=11;
 TX("Projekt: "+($("prj").value||"-"),11);TX(`Erstellt am ${new Date().toLocaleDateString("de-DE")}  |  Raster ${G.c} x ${G.r}, Rasterweite ${F(G.k)}`,9);y+=2;
 const o={n:sel.nn,b:sel.bn,c:sel.cs,d:sel.dm};
 if(sel.sys){HS("Systemzeichnung",125);IMG(await shot({p:false,k:false,v:false,...o}))}
-if(sel.dat){HS("Systemdaten");
+if(sel.dat){HS("Systemdaten",TBH(nodes.length));
 TB(["Knoten","x","z"],nodes.map((k,i)=>{const c=k.split(",");return[String(i+1),F(c[0]*G.k),F(Zc(c[1]*G.k))]}),[X0,X0+30,X0+60]);
 TB(["Stab","Anfang","Ende","Länge","Gelenk Anfang","Gelenk Ende"],bars.map((b,i)=>{const j=r=>[..."nqm"].filter(c=>r.includes(c)).map(c=>c.toUpperCase()).join(",")||"-";return[String(i+1),String(nno(b.a)),String(nno(b.b)),F(Math.hypot(b.b[0]-b.a[0],b.b[1]-b.a[1])*G.k),j(b.ra),j(b.rb)]}),[X0,X0+20,X0+40,X0+60,X0+90,X0+130]);
 if(sup.size)TB(["Knoten","Lager","Winkel"],[...sup].map(([k,v])=>[String(nno(k)||"-"),{E:"Einspannung",F:"Festlager",L:"Loslager"}[v.t],F(v.ang)+" Grad"]),[X0,X0+30,X0+80]);
@@ -426,10 +442,10 @@ const sr=[["Erde",bars.map((b,i)=>bs[i]===0?i+1:0).filter(Boolean).join(", ")||"
 TB(["Scheibe","Stäbe"],sr,[X0,X0+30])}
 if(sel.kin){HS("Kinematische Prüfung");TX(`Scheiben s = ${R.sf}, Lagerreaktionen r = ${R.r}, Verbindungskräfte v = ${R.v}, Abzählformel n = (r + v) - 3s = ${R.nz}, Freiheitsgrade f = ${f}.${f&&R.nz>=0?" Hinweis: Trotz n >= 0 ist das System verschieblich (kinematischer Sonderfall).":""}`);TX(f?`Das System ist kinematisch unbestimmt (verschieblich), f = ${f}.`+(f>1?` Dargestellt ist Bewegungsfigur ${mode+1} von ${f}.`:""):"Das System ist kinematisch bestimmt (unverschieblich). Es existiert nur die triviale Lösung; ein Polplan mit eindeutigen Polen ist nicht konstruierbar.")}
 if(sel.pol){HS("Polplan",125);if(f)IMG(await shot({p:true,k:false,v:false,...o}));else TX("Kein Polplan: Das System ist unverschieblich.")}
-if(sel.pt){HS("Haupt- und Nebenpole");if(f&&n){const rw=[];for(let i=1;i<=n;i++)rw.push([L(i,0),"Hauptpol",fp(g(i,0))]);for(let i=1;i<=n;i++)for(let j=i+1;j<=n;j++)rw.push([L(i,j),"Nebenpol",fp(g(i,j))]);TB(["Pol","Art","Lage (x | z)"],rw,[X0,X0+32,X0+62])}else TX("Keine Pole vorhanden.")}
+if(sel.pt){HS("Haupt- und Nebenpole",f&&n?TBH(n+n*(n-1)/2):40);if(f&&n){const rw=[];for(let i=1;i<=n;i++)rw.push([L(i,0),"Hauptpol",fp(g(i,0))]);for(let i=1;i<=n;i++)for(let j=i+1;j<=n;j++)rw.push([L(i,j),"Nebenpol",fp(g(i,j))]);TB(["Pol","Art","Lage (x | z)"],rw,[X0,X0+32,X0+62])}else TX("Keine Pole vorhanden.")}
 if(sel.ket||sel.vt){let png=null,kn=null;if(f){png=await shot({p:false,k:true,v:sel.vl,j:sel.pj,...o});kn=LK}
 if(sel.ket){HS("Kinematische Kette",130);if(kn){TX(kn.txt+".");IMG(png)}else TX("Keine kinematische Kette: Das System ist unverschieblich.")}
-if(sel.vt){HS("Verschiebungen der Knoten");if(kn){const rw=[];kn.seg.forEach(q=>[[q.ka,q.da,"Anfang"],[q.kb,q.db,"Ende"]].forEach(([p,d,e])=>rw.push([nno(p),q.k+1,e,F(Math.hypot(d[0],d[1])),F(d[0]),F(-d[1])])));rw.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);TB(["Knoten","Stab","Stabende","δ","δu","δw"],rw.map(r=>r.map(String)),[X0,X0+22,X0+44,X0+75,X0+105,X0+135]);TX("u positiv nach rechts, w positiv nach unten. Werte gelten für die angegebene Normierung der kinematischen Kette.",8)}else TX("Keine Verschiebungen: Das System ist unverschieblich.")}}
+if(sel.vt){HS("Verschiebungen der Knoten",f?TBH(R.n+1)+5:40);if(kn){const KS=kState();if(KS){TX(KS.txt+".");TB(["Scheibe","δϑ [rad]"],[...KS.rot.map(r=>[RM[r.i],F(r.t)]),["Erde","0"]],[X0,X0+30]);TB(["Knoten","Scheibe","δu","δw","δ"],KS.nd.map(q=>[String(q.nr),q.sch,F(q.du),F(q.dw),F(q.d)]),[X0,X0+22,X0+60,X0+90,X0+120]);TX("δϑ linksdrehend positiv, u positiv nach rechts, w positiv nach unten.",8);y+=2;doc.setFont("helvetica","bold");doc.setFontSize(10);nw(Math.min(7+6+kn.seg.length*10+3,287-X0));doc.text(PT("Verschiebungen je Stabende"),X0,y+4);y+=7}const rw=[];kn.seg.forEach(q=>[[q.ka,q.da,"Anfang"],[q.kb,q.db,"Ende"]].forEach(([p,d,e])=>rw.push([nno(p),q.k+1,e,F(Math.hypot(d[0],d[1])),F(d[0]),F(-d[1])])));rw.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);TB(["Knoten","Stab","Stabende","δ","δu","δw"],rw.map(r=>r.map(String)),[X0,X0+22,X0+44,X0+75,X0+105,X0+135]);TX("u positiv nach rechts, w positiv nach unten. Werte gelten für die angegebene Normierung der kinematischen Kette.",8)}else TX("Keine Verschiebungen: Das System ist unverschieblich.")}}
 const np=doc.getNumberOfPages();for(let i=1;i<=np;i++){doc.setPage(i);doc.setFont("helvetica","normal");doc.setFontSize(8);doc.text(`Lehrprogramm Statik, Prof. F. Böhme | Version ${VER}`,X0,292);doc.text(`Seite ${i} von ${np}`,W-X0,292,{align:"right"})}
 return showPdf("polplan-protokoll.pdf",doc.output("blob"),PW)}
 let fileH=null,fileName="polplan.json",named=false;
